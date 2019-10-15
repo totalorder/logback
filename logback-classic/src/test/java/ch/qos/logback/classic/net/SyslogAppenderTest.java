@@ -188,6 +188,11 @@ public class SyslogAppenderTest {
         mockServer.join(8000);
         assertTrue(mockServer.isFinished());
 
+        int i = 0;
+        for (byte[] line: mockServer.getMessageList()) {
+            System.out.println(String.format("%03d", i++) + ": " + new String(line));
+        }
+
         // 2 messages + 51 lines of stacktrace
         assertEquals(53, mockServer.getMessageList().size());
 
@@ -223,11 +228,11 @@ public class SyslogAppenderTest {
         assertEquals(79, mockServer.getMessageList().size());
 
         String msg = new String(mockServer.getMessageList().get(27));
-        assertTrue(msg.contains(suppressed1.getClass().getName()));
+        assertTrue(msg.contains(" \t\tSuppressed: " + suppressed1.getClass().getName()));
         assertTrue(msg.contains(suppressed1.getMessage()));
 
         msg = new String(mockServer.getMessageList().get(53));
-        assertTrue(msg.contains(suppressed2.getClass().getName()));
+        assertTrue(msg.contains(" \t\tSuppressed: " + suppressed2.getClass().getName()));
         assertTrue(msg.contains(suppressed2.getMessage()));
     }
 
@@ -267,20 +272,24 @@ public class SyslogAppenderTest {
         // 4 messages + 126 lines of stacktrace
         assertEquals(130, mockServer.getMessageList().size());
 
-        String msg = new String(mockServer.getMessageList().get(27));
-        assertTrue(msg.contains(suppressed1.getClass().getName()));
+        String msg = new String(mockServer.getMessageList().get(1));
+        assertTrue(msg.contains(" \t" + ex.getClass().getName()));
+        assertTrue(msg.contains(ex.getMessage()));
+
+        msg = new String(mockServer.getMessageList().get(27));
+        assertTrue(msg.contains(" \t\tSuppressed: " + suppressed1.getClass().getName()));
         assertTrue(msg.contains(suppressed1.getMessage()));
 
         msg = new String(mockServer.getMessageList().get(53));
-        assertTrue(msg.contains(cause2.getClass().getName()));
+        assertTrue(msg.contains(" \t\tCaused by: " + cause2.getClass().getName()));
         assertTrue(msg.contains(cause2.getMessage()));
 
         msg = new String(mockServer.getMessageList().get(79));
-        assertTrue(msg.contains(suppressed2.getClass().getName()));
+        assertTrue(msg.contains(" \t\tSuppressed: " + suppressed2.getClass().getName()));
         assertTrue(msg.contains(suppressed2.getMessage()));
 
         msg = new String(mockServer.getMessageList().get(105));
-        assertTrue(msg.contains(cause1.getClass().getName()));
+        assertTrue(msg.contains(" \tCaused by: " + cause1.getClass().getName()));
         assertTrue(msg.contains(cause1.getMessage()));
     }
 
