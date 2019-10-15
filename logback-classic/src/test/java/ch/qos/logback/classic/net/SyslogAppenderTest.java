@@ -170,6 +170,116 @@ public class SyslogAppenderTest {
         checkRegexMatch(msg, regex);
     }
 
+    @Test
+    public void causedBy() throws InterruptedException {
+        setMockServerAndConfigure(53);
+
+        String logMsg = "hello";
+
+        String causeMsg = "causing exception";
+        Exception cause = new Exception(causeMsg);
+        String exMsg = "just testing";
+        Exception ex = new Exception(exMsg, cause);
+        logger.debug(logMsg, ex);
+        StatusPrinter.print(lc);
+
+        // wait max 8 seconds for mock server to finish. However, it should
+        // much sooner than that.
+        mockServer.join(8000);
+        assertTrue(mockServer.isFinished());
+
+        // 2 messages + 51 lines of stacktrace
+        assertEquals(53, mockServer.getMessageList().size());
+
+        String msg = new String(mockServer.getMessageList().get(27));
+        assertTrue(msg.contains(cause.getClass().getName()));
+        assertTrue(msg.contains(cause.getMessage()));
+    }
+
+    @Test
+    public void suppressed() throws InterruptedException {
+        setMockServerAndConfigure(79);
+
+        String logMsg = "hello";
+
+        String exMsg = "just testing";
+        Exception ex = new Exception(exMsg);
+
+        String suppressedMsg1 = "suppressed exception 1";
+        Exception suppressed1 = new Exception(suppressedMsg1);
+        String suppressedMsg2 = "suppressed exception 2";
+        Exception suppressed2 = new Exception(suppressedMsg2);
+        ex.addSuppressed(suppressed1);
+        ex.addSuppressed(suppressed2);
+        logger.debug(logMsg, ex);
+        StatusPrinter.print(lc);
+
+        // wait max 8 seconds for mock server to finish. However, it should
+        // much sooner than that.
+        mockServer.join(8000);
+        assertTrue(mockServer.isFinished());
+
+        // 3 messages + 76 lines of stacktrace
+        assertEquals(79, mockServer.getMessageList().size());
+
+        String msg = new String(mockServer.getMessageList().get(27));
+        assertTrue(msg.contains(suppressed1.getClass().getName()));
+        assertTrue(msg.contains(suppressed1.getMessage()));
+
+        msg = new String(mockServer.getMessageList().get(53));
+        assertTrue(msg.contains(suppressed2.getClass().getName()));
+        assertTrue(msg.contains(suppressed2.getMessage()));
+    }
+
+    @Test
+    public void nestedCauseAndSuppressed() throws InterruptedException {
+        setMockServerAndConfigure(130);
+
+        String logMsg = "hello";
+
+        String causeMsg1 = "causing exception 1";
+        Exception cause1 = new Exception(causeMsg1);
+        String exMsg = "just testing";
+        Exception ex = new Exception(exMsg, cause1);
+
+        String causeMsg2 = "causing exception 2";
+        Exception cause2 = new Exception(causeMsg2);
+        String suppressedMsg1 = "suppressed exception 1";
+        Exception suppressed1 = new Exception(suppressedMsg1, cause2);
+
+        String suppressedMsg2 = "suppressed exception 2";
+        Exception suppressed2 = new Exception(suppressedMsg2);
+
+        ex.addSuppressed(suppressed1);
+        ex.addSuppressed(suppressed2);
+        logger.debug(logMsg, ex);
+        StatusPrinter.print(lc);
+
+        // wait max 8 seconds for mock server to finish. However, it should
+        // much sooner than that.
+        mockServer.join(8000);
+        assertTrue(mockServer.isFinished());
+
+        // 4 messages + 126 lines of stacktrace
+        assertEquals(130, mockServer.getMessageList().size());
+
+        String msg = new String(mockServer.getMessageList().get(27));
+        assertTrue(msg.contains(suppressed1.getClass().getName()));
+        assertTrue(msg.contains(suppressed1.getMessage()));
+
+        msg = new String(mockServer.getMessageList().get(53));
+        assertTrue(msg.contains(cause2.getClass().getName()));
+        assertTrue(msg.contains(cause2.getMessage()));
+
+        msg = new String(mockServer.getMessageList().get(79));
+        assertTrue(msg.contains(suppressed2.getClass().getName()));
+        assertTrue(msg.contains(suppressed2.getMessage()));
+
+        msg = new String(mockServer.getMessageList().get(105));
+        assertTrue(msg.contains(cause1.getClass().getName()));
+        assertTrue(msg.contains(cause1.getMessage()));
+    }
+
     private void checkRegexMatch(String s, String regex) {
         assertTrue("The string [" + s + "] did not match regex [" + regex + "]", s.matches(regex));
     }

@@ -84,31 +84,43 @@ public class SyslogAppender extends SyslogAppenderBase<ILoggingEvent> {
             return;
 
         String stackTracePrefix = stackTraceLayout.doLayout(event);
-        boolean isRootException = true;
-        while (tp != null) {
-            StackTraceElementProxy[] stepArray = tp.getStackTraceElementProxyArray();
-            try {
-                handleThrowableFirstLine(sw, tp, stackTracePrefix, isRootException);
-                isRootException = false;
-                for (StackTraceElementProxy step : stepArray) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(stackTracePrefix).append(step);
-                    sw.write(sb.toString().getBytes());
-                    sw.flush();
-                }
-            } catch (IOException e) {
-                break;
+        recursiveWrite(sw, stackTracePrefix, tp, null);
+    }
+
+    private void recursiveWrite(
+        OutputStream sw, String stackTracePrefix, IThrowableProxy tp, String prefix) {
+        StackTraceElementProxy[] stepArray = tp.getStackTraceElementProxyArray();
+        try {
+            handleThrowableFirstLine(sw, tp, stackTracePrefix, prefix);
+            for (StackTraceElementProxy step : stepArray) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(stackTracePrefix).append(step);
+                sw.write(sb.toString().getBytes());
+                sw.flush();
             }
-            tp = tp.getCause();
+        } catch (IOException e) {
+            return;
+        }
+
+        IThrowableProxy[] suppressed = tp.getSuppressed();
+        if (suppressed != null) {
+            for (IThrowableProxy current : suppressed) {
+                recursiveWrite(sw, stackTracePrefix, current, CoreConstants.SUPPRESSED);
+            }
+        }
+
+        IThrowableProxy cause = tp.getCause();
+        if (cause != null) {
+            recursiveWrite(sw, stackTracePrefix, cause, CoreConstants.CAUSED_BY);
         }
     }
 
     // LOGBACK-411 and LOGBACK-750
-    private void handleThrowableFirstLine(OutputStream sw, IThrowableProxy tp, String stackTracePrefix, boolean isRootException) throws IOException {
+    private void handleThrowableFirstLine(OutputStream sw, IThrowableProxy tp, String stackTracePrefix, String prefix) throws IOException {
         StringBuilder sb = new StringBuilder().append(stackTracePrefix);
 
-        if (!isRootException) {
-            sb.append(CoreConstants.CAUSED_BY);
+        if (prefix != null) {
+            sb.append(prefix);
         }
         sb.append(tp.getClassName()).append(": ").append(tp.getMessage());
         sw.write(sb.toString().getBytes());
