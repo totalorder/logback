@@ -258,6 +258,10 @@ public class SyslogAppenderTest {
         // wait max 8 seconds for mock server to finish. However, it should
         // much sooner than that.
         mockServer.join(8000);
+        int i = 0;
+        for (byte[] line: mockServer.getMessageList()) {
+            System.out.println(String.format("%03d", i++) + ": " + new String(line));
+        }
         assertTrue(mockServer.isFinished());
 
         // 4 messages + 126 lines of stacktrace

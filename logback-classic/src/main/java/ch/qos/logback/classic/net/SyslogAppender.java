@@ -84,17 +84,19 @@ public class SyslogAppender extends SyslogAppenderBase<ILoggingEvent> {
             return;
 
         String stackTracePrefix = stackTraceLayout.doLayout(event);
-        recursiveWrite(sw, stackTracePrefix, tp, null);
+        recursiveWrite(sw, stackTracePrefix, tp, 0, null);
     }
 
-    private void recursiveWrite(
-        OutputStream sw, String stackTracePrefix, IThrowableProxy tp, String prefix) {
+    private void recursiveWrite(OutputStream sw, String stackTracePrefix, IThrowableProxy tp,
+        int indent, String firstLinePrefix) {
         StackTraceElementProxy[] stepArray = tp.getStackTraceElementProxyArray();
         try {
-            handleThrowableFirstLine(sw, tp, stackTracePrefix, prefix);
+            handleThrowableFirstLine(sw, tp, stackTracePrefix, indent, firstLinePrefix);
             for (StackTraceElementProxy step : stepArray) {
                 StringBuilder sb = new StringBuilder();
-                sb.append(stackTracePrefix).append(step);
+                sb.append(stackTracePrefix);
+                addIndent(sb, indent);
+                sb.append(step);
                 sw.write(sb.toString().getBytes());
                 sw.flush();
             }
@@ -105,20 +107,27 @@ public class SyslogAppender extends SyslogAppenderBase<ILoggingEvent> {
         IThrowableProxy[] suppressed = tp.getSuppressed();
         if (suppressed != null) {
             for (IThrowableProxy current : suppressed) {
-                recursiveWrite(sw, stackTracePrefix, current, CoreConstants.SUPPRESSED);
+                recursiveWrite(sw, stackTracePrefix, current, indent + 1, CoreConstants.SUPPRESSED);
             }
         }
 
         IThrowableProxy cause = tp.getCause();
         if (cause != null) {
-            recursiveWrite(sw, stackTracePrefix, cause, CoreConstants.CAUSED_BY);
+            recursiveWrite(sw, stackTracePrefix, cause, indent, CoreConstants.CAUSED_BY);
+        }
+    }
+
+    private void addIndent(StringBuilder sb, int indent) {
+        for (int i = 0; i < indent; i++) {
+            sb.append(CoreConstants.TAB);
         }
     }
 
     // LOGBACK-411 and LOGBACK-750
-    private void handleThrowableFirstLine(OutputStream sw, IThrowableProxy tp, String stackTracePrefix, String prefix) throws IOException {
+    private void handleThrowableFirstLine(OutputStream sw, IThrowableProxy tp,
+        String stackTracePrefix, int indent, String prefix) throws IOException {
         StringBuilder sb = new StringBuilder().append(stackTracePrefix);
-
+        addIndent(sb, indent);
         if (prefix != null) {
             sb.append(prefix);
         }
